@@ -6,31 +6,35 @@
 
 #include "planet.h"
 #include "fmm.h"
+#include "tree.h"
+
+double error(std::vector<planet>& a, std::vector<planet>& b)
+{
+	int N = a.size();
+	double error = 0.0;
+
+	for (int i = 0; i < N; i++)
+		error += distance(a[i].force, b[i].force) / (dot(a[i].force, a[i].force));
+
+	return error;
+}
 
 int main()
 {
-	std::vector<planet> planets;
-	generate_planets(10, 1000999, 1100999, planets);
+	std::vector<planet> p2p_planets;
+	generate_planets(5, 0.0, 2.0, p2p_planets);
+	p2p(p2p_planets);
 
-	planet target = {};
-	target.position = { 50.0, 0.0 };
-	target.mass = 10.0;
+	std::vector<planet> fmm_planets;
+	generate_planets(5, 0.0, 2.0, fmm_planets);
 
-	p2p(planets, target);
+	tree* t = new tree(fmm_planets);
+	assemble_multipoles(t);
+	dual_tree_traversal(t);
 
-	std::cout << std::setprecision(15) << "(" << target.force.x << ", " << target.force.y << ")" << std::endl;
+	double e = error(p2p_planets, t->root->planets);
 
-	glm::dvec2 center = { 0.0, 0.0 };
-	for (auto& planet : planets)
-		center += planet.position;
+	std::cout << std::setprecision(15) << "Error: " << e << std::endl;
 
-	center /= planets.size();
-	multipole m(center);
-
-	for (int i = 0; i < 100; i++)
-		m.add(planets[i].position, planets[i].mass);
-
-	auto f = m.calc(target.position, target.mass);
-	std::cout << "(" << f.x << ", " << f.y << ")" << std::endl;
 	return 0;
 }
