@@ -1,5 +1,7 @@
 #pragma once
 
+#include <random>
+
 #include "glm/glm.hpp"
 
 struct planet
@@ -24,5 +26,19 @@ inline void generate_planets(int n, double a, double b, std::vector<planet>& pla
 			planets[i * n + j].position.y = a + j * h;
 			planets[i * n + j].mass = 1.0;
 		}
+	}
+}
+
+inline void random_planets(int n, double a, double b, std::vector<planet>& planets)
+{
+	std::uniform_real_distribution<double> uniform(0.0, 1.0);
+	std::default_random_engine engine;
+
+	planets.resize(n);
+	for (int i = 0; i < n; i++)
+	{
+		planets[i].position.x = a + uniform(engine) * (b - a);
+		planets[i].position.y = a + uniform(engine) * (b - a);
+		planets[i].mass = 10000.0;
 	}
 }

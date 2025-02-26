@@ -7,14 +7,14 @@
 void p2p(std::vector<planet>& planets)
 {
 	size_t n = planets.size();
-	for (int t = 0; t < n; t++)
+	for (auto& t : planets)
 	{
-		for (int s = 0; s < n; s++)
+		for (auto& s : planets)
 		{
-			glm::dvec2 forceDir = glm::normalize(planets[s].position - planets[t].position);
-			double r = glm::distance(planets[t].position, planets[s].position);
-			if (r > Eps)
-				planets[t].force += forceDir * G * planets[s].mass * planets[t].mass / (r * r);
+			glm::dvec2 forceDir = glm::normalize(s.position - t.position);
+			double r = glm::distance(s.position, t.position);
+            if (r > Eps)
+                 t.force += forceDir * G * s.mass * t.mass / (r * r);
 		}
 	}
 }
@@ -36,8 +36,11 @@ void assemble_multipoles(node* node)
 {
     if (node->is_leaf())
     {
-        for (auto& p : node->planets)
+        for (auto i : node->planet_indices)
+        {
+            auto& p = node->planets[i];
             node->m->add(p.position, p.mass);
+        }
 
         return;
     }
@@ -58,9 +61,11 @@ void dual_tree_traversal(node* source, node* target)
 {
     if (source->is_leaf() && target->is_leaf())
     {
-        for (auto& t : target->planets)
-            for (auto& s : source->planets)
+        for (auto ti : target->planet_indices)   
+            for (auto si : source->planet_indices)
             {
+                auto& t = target->planets[ti];
+                auto& s = source->planets[si];
                 glm::dvec2 forceDir = glm::normalize(s.position - t.position);
                 double r = glm::distance(t.position, s.position);
                 if (r > Eps)
@@ -75,9 +80,11 @@ void dual_tree_traversal(node* source, node* target)
     bool admissible = source_box->far_from(target_box);
     if (admissible)
     {
-        for (auto& t : target->planets)
+        for (auto ti : target->planet_indices)
+        {
+            auto& t = target->planets[ti];
             t.force += source->m->calc(t.position, t.mass);
-
+        }
         return;
     }
 

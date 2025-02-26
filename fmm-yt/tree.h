@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <numeric>
 
 #include "constants.h"
 #include "multipole.h"
@@ -40,14 +41,16 @@ struct node
 	node* right;
 
 	area* node_area;
-	std::vector<planet> planets;
+	std::vector<planet>& planets;
+	std::vector<int> planet_indices;
 	multipole* m;
 
-	node(node* left, node* right, area* node_area, std::vector<planet> planets) :
+	node(node* left, node* right, area* node_area, std::vector<planet>& planets, std::vector<int> planet_indices) :
 		left(left), 
 		right(right), 
 		node_area(node_area),
-		planets(planets), 
+		planets(planets),
+		planet_indices(planet_indices),
 		m(new multipole(node_area->center))
 	{}
 
@@ -62,35 +65,40 @@ struct tree
 	node* root;
 	int depth;
 
-	tree(std::vector<planet>& planets)
+	std::vector<planet>& planets;
+
+	tree(std::vector<planet>& planets): planets(planets)
 	{
-		root = fill_tree(0, planets);
+		std::vector<int> indices(planets.size());
+		std::iota(indices.begin(), indices.end(), 0);
+		root = fill_tree(0, indices);
 	}
 
-	node* fill_tree()
+	node *fill_tree(int depth, std::vector<int>& indices)
 	{
-	}
+		int size = indices.size();
+		std::vector<planet> current_planets(size);
+		for (int i = 0; i < size; i++)
+			current_planets[i] = planets[indices[i]];
 
-	node *fill_tree(int depth, std::vector<planet>& planets)
-	{
-		area* node_area = new area(planets);
-		if (planets.size() <= N0)
+		area* node_area = new area(current_planets);
+		if (size <= N0)
 		{
 			this->depth = depth;
-			return new node(nullptr, nullptr, node_area, planets);
+			return new node(nullptr, nullptr, node_area, planets, indices);
 		}
 
 		int k = 2;
 		int axis = depth % k;
-		std::sort(planets.begin(), planets.end(), [&](const planet& a, const planet& b) 
-			{ return a.position[axis] < b.position[axis]; });
+		std::sort(indices.begin(), indices.end(), [&](int i, int j)
+			{ return planets[i].position[axis] < planets[j].position[axis]; });
 		
-		int split = planets.size() / 2;
-		std::vector<planet> left_particles(planets.begin(), planets.begin() + split);
-		std::vector<planet> right_particles(planets.begin() + split, planets.end());
+		int split = indices.size() / 2;
+		std::vector<int> left_indices(indices.begin(), indices.begin() + split);
+		std::vector<int> right_indices(indices.begin() + split, indices.end());
 
-		node* left = fill_tree(depth + 1, left_particles);
-		node* right = fill_tree(depth + 1, right_particles);
-		return new node(left, right, node_area, planets);
+		node* left = fill_tree(depth + 1, left_indices);
+		node* right = fill_tree(depth + 1, right_indices);
+		return new node(left, right, node_area, planets, indices);
 	}
 };
