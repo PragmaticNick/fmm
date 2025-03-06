@@ -128,6 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="fmm.cpp" />
+    <ClCompile Include="local.h" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

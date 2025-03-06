@@ -2,6 +2,8 @@
 
 #include <glm/glm.hpp>
 
+#include "constants.h"
+
 struct multipole
 {
 	glm::dvec2 center = { 0.0, 0.0 };

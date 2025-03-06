@@ -39,6 +39,6 @@ inline void random_planets(int n, double a, double b, std::vector<planet>& plane
 	{
 		planets[i].position.x = a + uniform(engine) * (b - a);
 		planets[i].position.y = a + uniform(engine) * (b - a);
-		planets[i].mass = 10000.0;
+		planets[i].mass = 1000000000.0;
 	}
 }

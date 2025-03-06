@@ -8,6 +8,7 @@
 #include "planet.h"
 #include "fmm.h"
 #include "tree.h"
+#include "local.h"
 
 double error(std::vector<glm::dvec2>& a, std::vector<glm::dvec2>& b)
 {
@@ -53,21 +54,44 @@ std::vector<glm::dvec2> treecode(std::vector<planet>& planets)
 
 int main()
 {
-	for (int n = 10; n <= 100000; n *= 10)
-	{
-		std::cout << "Planet count: " << n << std::endl;
-		std::vector<planet> planets;
-		random_planets(n, 0.0, 1.0, planets);
+	std::vector<planet> planets1, planets2, planets3, targets;
+	random_planets(100, 0.0, 1.0, planets1);
+	random_planets(100, 1.0, 2.0, planets2);
+	random_planets(100, 2.0, 3.0, planets3);
+	random_planets(100, 10300.0, 10301.0, targets);
 
-		auto p2p_forces = direct(planets);
-		for (auto& p : planets)
-			p.force = { 0.0, 0.0 };
-		auto fmm_forces = treecode(planets);
-
-		double e = error(p2p_forces, fmm_forces);
-		std::cout << std::setprecision(5) << "Error: " << e << "%" << std::endl;
-		std::cout << std::endl;
+	auto m1 = new multipole({ 0.5, 0.5 });
+	auto m2 = new multipole({ 1.5, 1.5 });
+	auto m3 = new multipole({ 2.5, 2.5 });
+	auto l = new local({ 10300.5, 10300.5 });
+	for (int i = 0; i < 100; i++) {
+		m1->add(planets1[i].position, planets1[i].mass);
+		m2->add(planets2[i].position, planets2[i].mass);
+		m3->add(planets3[i].position, planets3[i].mass);
 	}
+
+	l->add(*m1);
+	l->add(*m2);
+	l->add(*m3);
+
+	std::vector<glm::dvec2> fmm_forces(100);
+	for (int i = 0; i < 100; i++)
+		fmm_forces[i] = l->calc(targets[i].position, targets[i].mass);
+
+	planets1.insert(planets1.end(), planets2.begin(), planets2.end());
+	planets1.insert(planets1.end(), planets3.begin(), planets3.end());
+
+	std::vector<glm::dvec2> p2p_forces(100);
+	for (int i = 0; i < 100; i++)
+	{
+		p2p(planets1, targets[i]);
+		p2p_forces[i] = targets[i].force;
+		p2p_forces[i].y = 0.0;
+	}
+
+	double e = error(p2p_forces, fmm_forces);
+
+	std::cout << "Error: " << e << std::endl;
 
 	return 0;
 }
