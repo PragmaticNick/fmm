@@ -1,90 +1,59 @@
-#include <iostream>
-#include <iomanip>
-#include <vector>
-#include <chrono>
+#include <string>
+#include <format>
 
-#include <glm/glm.hpp>
+#include <raylib.h>
+#include <raymath.h>
 
-#include "planet.h"
 #include "fmm.h"
-#include "tree.h"
-#include "local.h"
+#include "constants.h"
 
-double error(std::vector<glm::dvec2>& a, std::vector<glm::dvec2>& b)
+#include "galaxy.h"
+
+const Color background_color = { 50, 52, 55, 255 };
+const Color planet_color = { 235, 231, 205, 255 };
+
+struct state
 {
-	int N = a.size();
-	double error = 0.0;
+	std::vector<planet> planets;
+	Camera2D camera;
+	Texture2D planet_texture;
+};
 
-	for (int i = 0; i < N; i++)
-		error += distance(a[i], b[i]) / glm::length(a[i]);
+double galaxy_radius = 500.0;
 
-	return error / N * 100;
-}
-
-std::vector<glm::dvec2> direct(std::vector<planet>& planets)
+void input(state& state)
 {
-	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-	p2p(planets);
-	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-	std::cout << "P2P      = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-
-	std::vector<glm::dvec2> forces;
-	for (auto& p : planets)
-		forces.push_back(p.force);
-
-	return forces;
-
-}
-
-std::vector<glm::dvec2> treecode(std::vector<planet>& planets)
-{
-	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-	tree* t = new tree(planets);
-	assemble_multipoles(t);
-	dual_tree_traversal(t, false);
-	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-	std::cout << "TREECODE = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-
-	std::vector<glm::dvec2> forces;
-	for (auto& p : planets)
-		forces.push_back(p.force);
-
-	return forces;
-}
-
-std::vector<glm::dvec2> fmm(std::vector<planet>& planets)
-{
-	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-	tree* t = new tree(planets);
-	assemble_multipoles(t);
-	dual_tree_traversal(t, true);
-	downward_pass(t);
-	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-	std::cout << "FMM = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-
-	std::vector<glm::dvec2> forces;
-	for (auto& p : planets)
-		forces.push_back(p.force);
-
-	return forces;
-}
-
-void test1() {
-	int n = 100;
-	std::vector<planet> sources1, sources2;
-	random_planets(n, 0.0, 1.0, sources1);
-	random_planets(n, 4.0, 5.0, sources2);
-
-	int m = 1000;
-	std::vector<planet> targets;
-	random_planets(m, 100.0, 101.0, targets);
-
-	multipole m1({ 0.5, 0.5 });
-	multipole m2({ 4.5, 4.5 });
-	for (int i = 0; i < n; i++)
+	float wheel = GetMouseWheelMove();
+	if (wheel != 0)
 	{
-		m1.add(sources1[i].position, sources1[i].mass);
-		m2.add(sources2[i].position, sources2[i].mass);
+		Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), state.camera);
+		state.camera.offset = GetMousePosition();
+		state.camera.target = mouseWorldPos;
+		
+		float scaleFactor = 1.0f + (0.25f * fabsf(wheel));
+		if (wheel < 0) scaleFactor = 1.0f / scaleFactor;
+		state.camera.zoom = state.camera.zoom * scaleFactor;
+	}
+}
+
+void update(state& state, double dt)
+{
+	p2p(state.planets);
+
+	size_t size = state.planets.size();
+	for (int i = 0; i < size; i++)
+	{
+		planet& p = state.planets[i];
+		double step = 1.0e-4;
+		double sum = 0.0;
+		while (sum < dt)
+		{
+			auto ai = p.force / p.mass;
+			auto vi = p.velocity;
+			p.velocity += ai * Step;
+			p.position += vi * Step;
+			sum += step;	
+		}
 	}
 
 	tree t(targets);
@@ -113,46 +82,98 @@ void test1() {
 	std::cout << std::endl;
 }
 
-void test2() {
-	int n = 4;
-	double m = 100000.0;
-	std::vector<planet> sources = {
-		planet({-4.0, 0.0}, m),
-		planet({-2.0, 0.0}, m),
-		planet({2.0, 0.0}, m),
-		planet({4.0, 0.0}, m),
-	};
+void update_old(state& state, double dt)
+{
+	p2p(state.planets);
 
-	auto p2p_forces = direct(sources);
-	for (auto& p : sources) p.force = { 0.0, 0.0 };
-	auto tree_forces = treecode(sources);
-	for (auto& p : sources) p.force = { 0.0, 0.0 };
-	auto fmm_forces = fmm(sources);
+	size_t size = state.planets.size();
+	for (int i = 0; i < size; i++)
+	{
+		planet& p = state.planets[i];
+		auto a = p.force / p.mass;
+		auto v = p.velocity;
+		p.velocity += a * dt;
+		p.position += v * dt;
+	}
+}
 
-	// Error
-	std::cout << std::setprecision(5) << "P2P vs TREECODE: " << error(p2p_forces, tree_forces) << "%" << std::endl;
-	std::cout << std::setprecision(5) << "P2P vs FMM: " << error(p2p_forces, fmm_forces) << "%" << std::endl;
+
+void draw(state& state)
+{
+	int fps = GetFPS();
+	BeginDrawing();
+		BeginMode2D(state.camera);
+		ClearBackground(background_color);
+
+		for (auto& planet : state.planets)
+		{
+			/*double r = planet.radius;
+			Rectangle src = { 0, 0, state.planet_texture.width, state.planet_texture.height };
+			Rectangle dst = { planet.position.x - 3 * r, planet.position.y - 3 * r, r * 6, r * 6 };
+			DrawTexturePro(state.planet_texture, src, dst, { 0, 0 }, 0.0f, RAYWHITE);*/
+			DrawCircle(planet.position.x, planet.position.y, planet.radius, planet_color);
+		}
+		EndMode2D();
+
+		std::string fps_string = "FPS: " + std::to_string(GetFPS());
+		std::string planet_string = "Planets: " + std::to_string(state.planets.size());
+		DrawText(fps_string.c_str(), 0, 0, 40, RAYWHITE);
+		DrawText(planet_string.c_str(), 0, 40, 40, RAYWHITE);
+	EndDrawing();
+}
+
+void main_loop(state& state)
+{
+	while (!WindowShouldClose())
+	{
+		input(state);
+		float dt = GetFrameTime();
+		update(state, dt);
+		draw(state);
+	}
 }
 
 int main()
 {
-	for (int n = 100; n <= 1000000; n *= 10)
-	{
-		std::cout << "Planet count: " << n << std::endl;
-		std::vector<planet> planets;
-		random_planets(n, 0.0, 1.0, planets);
+	SetConfigFlags(FLAG_MSAA_4X_HINT);
 
-		auto p2p_forces = direct(planets);
-		for (auto& p : planets) p.force = { 0.0, 0.0 };
-		auto tree_forces = treecode(planets);
-		for (auto& p : planets) p.force = { 0.0, 0.0 };
-		auto fmm_forces = fmm(planets);
+	int screenWidth = 1600;
+	int screenHeight = 900;
+	InitWindow(screenWidth, screenHeight, "P2P");
 
-		std::cout << std::endl;
-		std::cout << std::setprecision(5) << "P2P vs TREECODE: " << error(p2p_forces, tree_forces) << "%" << std::endl;
-		std::cout << std::setprecision(5) << "P2P vs FMM: " << error(p2p_forces, fmm_forces) << "%" << std::endl;
-		std::cout << std::endl;
-	}
+	Image image = LoadImage("./glow.png");
+	Texture2D texture = LoadTextureFromImage(image);
+	UnloadImage(image);
+
+	state state;
+	state.planet_texture = texture;
+
+	Camera2D camera = {};
+	camera.offset = { 0, 0 };
+	camera.rotation = 0.0f;
+	camera.zoom = 1.0f;
+	camera.target = { -screenWidth / 2.0f / camera.zoom, -screenHeight / 2.0f / camera.zoom};
+
+	state.camera = camera;
+
+	//planet earth = {};
+	//earth.mass = 5.972e+24;
+	//earth.position = { 0, 0 };
+	//earth.velocity = { 0.0, 0.0 };
+	//earth.radius = 6371 * 1000;
+
+	//state.planets.push_back(earth);
+
+	//planet moon = { };
+	//moon.mass = 7.36e+22;
+	//moon.position = { 384400 * 1000, 0 };
+	//moon.velocity = { 0.0, 1020.0 };
+	//moon.radius = 1737 * 1000;
+
+	//state.planets.push_back(moon);
+	generate_galaxy(state.planets);
+
+	main_loop(state);
 
 	return 0;
 }
