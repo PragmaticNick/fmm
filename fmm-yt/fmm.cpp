@@ -57,7 +57,7 @@ void assemble_multipoles(tree* t)
     assemble_multipoles(t->root);
 }
 
-void dual_tree_traversal(node* source, node* target)
+void dual_tree_traversal(node* source, node* target, bool m2l)
 {
     if (source->is_leaf() && target->is_leaf())
     {
@@ -80,6 +80,11 @@ void dual_tree_traversal(node* source, node* target)
     bool admissible = source_box->far_from(target_box);
     if (admissible)
     {
+        if (m2l) {
+            target->l->add(source->m);
+            return;
+        }
+
         for (auto ti : target->planet_indices)
         {
             auto& t = target->planets[ti];
@@ -90,31 +95,56 @@ void dual_tree_traversal(node* source, node* target)
 
     if (source->is_leaf())
     {
-        dual_tree_traversal(source, target->left);
-        dual_tree_traversal(source, target->right);
+        dual_tree_traversal(source, target->left, m2l);
+        dual_tree_traversal(source, target->right, m2l);
         return;
     }
 
     if (target->is_leaf())
     {
-        dual_tree_traversal(source->left, target);
-        dual_tree_traversal(source->right, target);
+        dual_tree_traversal(source->left, target, m2l);
+        dual_tree_traversal(source->right, target, m2l);
         return;
     }
 
     if (target_box->radius > source_box->radius)
     {
-        dual_tree_traversal(source, target->left);
-        dual_tree_traversal(source, target->right);
+        dual_tree_traversal(source, target->left, m2l);
+        dual_tree_traversal(source, target->right, m2l);
     }
     else
     {
-        dual_tree_traversal(source->left, target);
-        dual_tree_traversal(source->right, target);
+        dual_tree_traversal(source->left, target, m2l);
+        dual_tree_traversal(source->right, target, m2l);
     }
 }
 
-void dual_tree_traversal(tree* t)
+void dual_tree_traversal(tree* t, bool m2l)
 {
-    dual_tree_traversal(t->root, t->root);
+    dual_tree_traversal(t->root, t->root, m2l);
+}
+
+void downward_pass(node* node)
+{
+    if (node->is_leaf())
+    {
+        for (auto i : node->planet_indices)
+        {
+            auto& p = node->planets[i];
+            p.force += node->l->calc(p.position, p.mass);
+        }
+        return;
+    }
+
+    node->left->l->add(node->l);
+    node->right->l->add(node->l);
+
+    downward_pass(node->left);
+    downward_pass(node->right);
+}
+
+
+void downward_pass(tree* t)
+{
+    downward_pass(t->root);
 }

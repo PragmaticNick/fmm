@@ -6,8 +6,8 @@
 
 #include "constants.h"
 #include "multipole.h"
+#include "local.h"
 #include "planet.h"
-
 
 struct area
 {
@@ -44,6 +44,7 @@ struct node
 	std::vector<planet>& planets;
 	std::vector<int> planet_indices;
 	multipole* m;
+	local* l;
 
 	node(node* left, node* right, area* node_area, std::vector<planet>& planets, std::vector<int> planet_indices) :
 		left(left), 
@@ -51,7 +52,8 @@ struct node
 		node_area(node_area),
 		planets(planets),
 		planet_indices(planet_indices),
-		m(new multipole(node_area->center))
+		m(new multipole(node_area->center)),
+		l(new local(node_area->center))
 	{}
 
 	bool is_leaf()
