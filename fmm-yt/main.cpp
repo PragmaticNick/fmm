@@ -12,27 +12,15 @@
 const Color background_color = { 50, 52, 55, 255 };
 const Color planet_color = { 235, 231, 205, 255 };
 
+int width = 1920;
+int height = 1080;
+int frame_count = 1;
+
 struct state
 {
 	std::vector<planet> planets;
 	Camera2D camera;
 };
-
-
-void input(state& state)
-{
-	float wheel = GetMouseWheelMove();
-	if (wheel != 0)
-	{
-		Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), state.camera);
-		state.camera.offset = GetMousePosition();
-		state.camera.target = mouseWorldPos;
-		
-		float scaleFactor = 1.0f + (0.25f * fabsf(wheel));
-		if (wheel < 0) scaleFactor = 1.0f / scaleFactor;
-		state.camera.zoom = state.camera.zoom * scaleFactor;
-	}
-}
 
 void update(state& state, double dt)
 {
@@ -43,7 +31,10 @@ void update(state& state, double dt)
 		for (auto& p : state.planets)
 			p.force = { 0.0, 0.0 };
 
-		p2p(state.planets);
+		tree t(state.planets);
+		assemble_multipoles(&t);
+		dual_tree_traversal(&t, true);
+		downward_pass(&t);
 
 		size_t size = state.planets.size();
 		for (int i = 0; i < size; i++)
@@ -59,70 +50,64 @@ void update(state& state, double dt)
 	}
 }
 
-void update_old(state& state, double dt)
+void draw(state& state, int frame_number)
 {
-	p2p(state.planets);
-
-	size_t size = state.planets.size();
-	for (int i = 0; i < size; i++)
-	{
-		planet& p = state.planets[i];
-		auto a = p.force / p.mass;
-		auto v = p.velocity;
-		p.velocity += a * dt;
-		p.position += v * dt;
-	}
-}
-
-
-void draw(state& state)
-{
+	RenderTexture2D target = LoadRenderTexture(width, height);
 	int fps = GetFPS();
-	BeginDrawing();
+	BeginTextureMode(target);
 		BeginMode2D(state.camera);
 		ClearBackground(background_color);
 
 		for (auto& planet : state.planets)
 			DrawCircle(planet.position.x, planet.position.y, planet.radius, planet_color);
 		EndMode2D();
+	EndTextureMode();
 
-		std::string fps_string = "FPS: " + std::to_string(GetFPS());
-		std::string planet_string = "Planets: " + std::to_string(state.planets.size());
-		DrawText(fps_string.c_str(), 0, 0, 40, RAYWHITE);
-		DrawText(planet_string.c_str(), 0, 40, 40, RAYWHITE);
-	EndDrawing();
+	Image frame = LoadImageFromTexture(target.texture);
+	ExportImage(frame, std::format("../frames/frame{}.png", frame_number).c_str());
+	UnloadImage(frame);
+	UnloadRenderTexture(target);
 }
 
 void main_loop(state& state)
 {
-	while (!WindowShouldClose())
+	double dt = 0.1;
+	int frame = 0;
+	while (frame < frame_count)
 	{
-		input(state);
-		float dt = GetFrameTime();
 		update(state, dt);
-		draw(state);
+		draw(state, frame++);
 	}
 }
 
 int main()
 {
 	SetConfigFlags(FLAG_MSAA_4X_HINT);
-
-	int screenWidth = 1600;
-	int screenHeight = 900;
-	InitWindow(screenWidth, screenHeight, "P2P");
+	SetConfigFlags(FLAG_WINDOW_HIDDEN);
+	InitWindow(width, height, "P2P");
 
 
 	Camera2D camera = {};
 	camera.offset = { 0, 0 };
 	camera.rotation = 0.0f;
 	camera.zoom = 1.0f;
-	camera.target = { -screenWidth / 2.0f / camera.zoom, -screenHeight / 2.0f / camera.zoom};
+	camera.target = { -width / 2.0f / camera.zoom, -height / 2.0f / camera.zoom};
 
 	state state;
 	state.camera = camera;
 
-	generate_galaxy(state.planets);
+	galaxy_config config = {};
+	config.center = { 0.0, 0.0 };
+	config.radius = 300.0;
+	config.core_mass = 1000.0;
+	config.star_count = 1000;
+	config.star_mass = 10.0;
+	config.star_radius = 2.0;
+	config.arm_count = 5;
+	config.arm_rotation_factor = 3.0;
+	config.arm_max_offset = 0.8;
+
+	generate_galaxy(config, state.planets);
 
 	main_loop(state);
 

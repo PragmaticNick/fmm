@@ -38,6 +38,9 @@
     <ClInclude Include="multipole.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="galaxy.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="constants.h">
