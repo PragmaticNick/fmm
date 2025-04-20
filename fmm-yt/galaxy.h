@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <raylib.h>
 
 struct galaxy_config {
 	glm::dvec2 center;
@@ -14,6 +15,10 @@ struct galaxy_config {
 
 	double star_mass;
 	double star_radius;
+
+	double gap;
+
+	Color color;
 };
 
 void generate_galaxy(galaxy_config& config, std::vector<planet>& output)
@@ -22,6 +27,7 @@ void generate_galaxy(galaxy_config& config, std::vector<planet>& output)
 	core.position = config.center;
 	core.mass = config.core_mass;
 	core.radius = config.star_radius * 3;
+	core.color = config.color;
 	output.push_back(core);
 
 	std::random_device rd;
@@ -42,14 +48,18 @@ void generate_galaxy(galaxy_config& config, std::vector<planet>& output)
 
 		phi = (int)(phi / arm_angle) * arm_angle + r * config.arm_rotation_factor + squared_arm_offset;
 
-		r = r * config.radius;
+		r = config.gap + r * (config.radius - config.gap);
 		double x = config.center.x + r * cos(phi);
 		double y = config.center.y + r * sin(phi);
+
+		double M = config.core_mass + config.star_mass;
 
 		planet p = {};
 		p.position = { x, y };
 		p.mass = config.star_mass;
 		p.radius = config.star_radius;
+		p.velocity = std::sqrt(G * M / r) * glm::dvec2(sin(phi), -cos(phi));
+		p.color = config.color;
 
 		output.push_back(p);
 	}

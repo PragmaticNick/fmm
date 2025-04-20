@@ -14,17 +14,18 @@ const Color planet_color = { 235, 231, 205, 255 };
 
 int width = 1920;
 int height = 1080;
-int frame_count = 1;
+int frame_count = 2000;
 
 struct state
 {
 	std::vector<planet> planets;
 	Camera2D camera;
+	Texture2D star_texture;
 };
 
 void update(state& state, double dt)
 {
-	double step = 0.0001;
+	double step = 0.001;
 	double sum = 0.0;
 	while (sum < dt)
 	{
@@ -56,10 +57,18 @@ void draw(state& state, int frame_number)
 	int fps = GetFPS();
 	BeginTextureMode(target);
 		BeginMode2D(state.camera);
+
+		BeginBlendMode(BLEND_ADDITIVE);
 		ClearBackground(background_color);
 
 		for (auto& planet : state.planets)
-			DrawCircle(planet.position.x, planet.position.y, planet.radius, planet_color);
+		{
+			double r = planet.radius;
+			Rectangle src = { 0, 0, state.star_texture.width, state.star_texture.height };
+			Rectangle dst = { planet.position.x - 3 * r, planet.position.y - 3 * r, r * 6, r * 6 };
+			DrawTexturePro(state.star_texture, src, dst, { 0, 0 }, 0.0f, planet.color);
+		}
+		EndBlendMode();
 		EndMode2D();
 	EndTextureMode();
 
@@ -71,7 +80,7 @@ void draw(state& state, int frame_number)
 
 void main_loop(state& state)
 {
-	double dt = 0.1;
+	double dt = 0.01;
 	int frame = 0;
 	while (frame < frame_count)
 	{
@@ -86,6 +95,9 @@ int main()
 	SetConfigFlags(FLAG_WINDOW_HIDDEN);
 	InitWindow(width, height, "P2P");
 
+	Image image = LoadImage("../star.png");
+	Texture2D texture = LoadTextureFromImage(image);
+	UnloadImage(image);
 
 	Camera2D camera = {};
 	camera.offset = { 0, 0 };
@@ -95,18 +107,25 @@ int main()
 
 	state state;
 	state.camera = camera;
+	state.star_texture = texture;
 
 	galaxy_config config = {};
-	config.center = { 0.0, 0.0 };
+	config.center = { -200.0, -200.0 };
 	config.radius = 300.0;
-	config.core_mass = 1000.0;
+	config.core_mass = 1000000.0;
 	config.star_count = 1000;
 	config.star_mass = 10.0;
-	config.star_radius = 2.0;
+	config.star_radius = 5.0;
 	config.arm_count = 5;
 	config.arm_rotation_factor = 3.0;
 	config.arm_max_offset = 0.8;
+	config.gap = 10.0;
+	config.color = RED;
 
+	generate_galaxy(config, state.planets);
+
+	config.center = { 200.0, 200.0 };
+	config.color = SKYBLUE;
 	generate_galaxy(config, state.planets);
 
 	main_loop(state);

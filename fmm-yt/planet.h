@@ -2,7 +2,8 @@
 
 #include <random>
 
-#include "glm/glm.hpp"
+#include <glm/glm.hpp>
+#include <raylib.h>
 
 struct planet
 {
@@ -12,8 +13,7 @@ struct planet
 	double radius;
 	glm::dvec2 force;
 
-	planet() = default;
-	planet(glm::dvec2 pos, double mass) : position(pos), mass(mass) {}
+	Color color;
 };
 
 
